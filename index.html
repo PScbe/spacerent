@@ -4,22 +4,17 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Possible Studio Rental Manager</title>
-  <!-- Fixed: Replaced broken favicon link with an inline SVG to prevent console errors -->
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='50' fill='%23facc15'/></svg>" />
 
-  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   
-  <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-  <!-- Firebase v8 SDKs (compatible with the existing code syntax) -->
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
-  <!-- React and ReactDOM -->
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 
@@ -182,7 +177,7 @@
       }
 
       return createElement('div', { className: "fixed inset-0 bg-black/70 flex items-center justify-center z-50", onClick: onClose },
-        createElement('div', { className: "bg-gray-900 p-8 rounded-xl shadow-lg ring-1 ring-yellow-400/50 w-full max-w-sm m-4", onClick: e => e.stopPropagation() },
+        createElement('div', { className: "bg-gray-900 p-8 rounded-xl shadow-lg ring-1 ring-yellow-400/50 w-full max-sm m-4", onClick: e => e.stopPropagation() },
           createElement('h2', { className: "text-2xl font-bold text-white mb-4" }, "Admin Login"),
           createElement('form', { onSubmit: handleSubmit },
             createElement('input', { type: "password", className: "w-full px-4 py-3 bg-gray-800 border border-gray-600 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-400 mb-4", placeholder: "Enter admin password", value: password, onChange: e => setPassword(e.target.value), autoFocus: true }),
@@ -752,6 +747,7 @@
       const [editBooking, setEditBooking] = useState(null);
       const [loading, setLoading] = useState(true);
       const [selectedMonth, setSelectedMonth] = useState(String(new Date().getMonth() + 1));
+      const [selectedYear, setSelectedYear] = useState(String(new Date().getFullYear())); // Default to current year
       const [error, setError] = useState('');
       const [successMsg, setSuccessMsg] = useState('');
       const [currentTime, setCurrentTime] = useState(new Date());
@@ -884,12 +880,27 @@
         };
       }, [bookings, currentTime]);
 
+      // Filter Past Bookings by Month and Year
       const filteredPastBookings = useMemo(() => {
-        if (selectedMonth === "all") return pastBookings;
-        return pastBookings.filter(b => 
-            (new Date(b.bookingSegments[0].date).getMonth() + 1) === Number(selectedMonth)
-        );
-      }, [pastBookings, selectedMonth]);
+        return pastBookings.filter(b => {
+            const bookingDate = new Date(b.bookingSegments[0].date);
+            const monthMatches = selectedMonth === "all" || (bookingDate.getMonth() + 1) === Number(selectedMonth);
+            const yearMatches = selectedYear === "all" || bookingDate.getFullYear() === Number(selectedYear);
+            return monthMatches && yearMatches;
+        });
+      }, [pastBookings, selectedMonth, selectedYear]);
+
+      // Generate list of years from existing bookings + current year for selection
+      const availableYears = useMemo(() => {
+        const years = new Set();
+        years.add(new Date().getFullYear());
+        bookings.forEach(b => {
+            if (b.bookingSegments) {
+                b.bookingSegments.forEach(s => years.add(new Date(s.date).getFullYear()));
+            }
+        });
+        return Array.from(years).sort((a, b) => b - a);
+      }, [bookings]);
 
       const printSummaryRentals = useMemo(() => {
         return [...filteredPastBookings].sort((a, b) => (a.bookingSegments[0].date).localeCompare(b.bookingSegments[0].date));
@@ -943,13 +954,22 @@
           ),
           
           createElement('div', { className: "my-8" },
-            createElement('div', { className: "flex flex-col sm:flex-row justify-between items-center gap-4 mb-6" },
-              createElement('h2', { className: "text-3xl font-bold text-yellow-400 border-b-2 border-gray-700 pb-2 flex-grow" }, "Past Bookings"),
-              createElement('div', { className: "print:hidden" },
-                createElement('label', { htmlFor: "month-filter", className: "font-semibold text-gray-400 mr-2" }, "Filter by Month:"),
-                createElement('select', { id: "month-filter", className: "bg-gray-800 border border-gray-700 rounded-md px-2 py-1 text-white", value: selectedMonth, onChange: e => setSelectedMonth(e.target.value) },
-                  createElement('option', { value: "all" }, "All Months"),
-                  MONTHS.map((m, i) => createElement('option', { key: i, value: i + 1 }, m))
+            createElement('div', { className: "flex flex-col lg:flex-row justify-between lg:items-center gap-4 mb-6 border-b-2 border-gray-700 pb-2" },
+              createElement('h2', { className: "text-3xl font-bold text-yellow-400 flex-grow" }, "Past Bookings"),
+              createElement('div', { className: "flex flex-wrap items-center gap-4 print:hidden" },
+                createElement('div', null,
+                  createElement('label', { htmlFor: "month-filter", className: "font-semibold text-gray-400 mr-2" }, "Month:"),
+                  createElement('select', { id: "month-filter", className: "bg-gray-800 border border-gray-700 rounded-md px-2 py-1 text-white", value: selectedMonth, onChange: e => setSelectedMonth(e.target.value) },
+                    createElement('option', { value: "all" }, "All Months"),
+                    MONTHS.map((m, i) => createElement('option', { key: i, value: i + 1 }, m))
+                  )
+                ),
+                createElement('div', null,
+                  createElement('label', { htmlFor: "year-filter", className: "font-semibold text-gray-400 mr-2" }, "Year:"),
+                  createElement('select', { id: "year-filter", className: "bg-gray-800 border border-gray-700 rounded-md px-2 py-1 text-white", value: selectedYear, onChange: e => setSelectedYear(e.target.value) },
+                    createElement('option', { value: "all" }, "All Years"),
+                    availableYears.map(y => createElement('option', { key: y, value: y }, y))
+                  )
                 )
               )
             ),
